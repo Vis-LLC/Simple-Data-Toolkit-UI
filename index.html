@@ -1,0 +1,677 @@
+<html>
+    <head>
+        <script src="sdtk-lib-browser.js"></script>
+        <script src="fe-browser.js"></script>
+        <link href="FieldEngine.css" rel="stylesheet" />
+        <link href="FieldEngine-Defaults.css" rel="stylesheet" />
+        <style>
+            .field_tile {
+                text-align: center;
+                align-content: center;
+                vertical-align: middle;
+                padding: 0px;
+                border-style: solid;
+                border-width: thin;
+            }            
+
+            .outputOption td {
+                height: fit-content;
+                width: 10vw;
+            }
+
+            #id {
+                width: 90vw;
+            }
+
+            #dDisplay.header-no #dData {
+                width: 100vw;
+                height: 85vh;
+                max-width: 100vw;
+                max-height: 85vh;                
+                min-width: 100vw;
+                min-height: 85vh;                
+                left: 0vw;
+                top: 15vh;
+                position: absolute;
+            }
+
+            #dDisplay.header-yes #dData {
+                width: 100vw;
+                height: 76.5vh;
+                max-width: 100vw;
+                max-height: 76.5vh;                
+                min-width: 100vw;
+                min-height: 76.5vh;                
+                left: 0vw;
+                top: 23.5vh;
+                position: absolute;
+            }
+
+            #dDisplay.header-no #dHeader {
+                display: none;
+            }
+
+            #dDisplay.header-yes #dHeader {
+                width: 100vw;
+                height: 8.5vh;
+                max-width: 100vw;
+                max-height: 8.5vh;                
+                min-width: 100vw;
+                min-height: 8.5vh;                
+                left: 0vw;
+                top: 15vh;
+                position: absolute;
+                font-weight: bolder;
+            }
+
+            #dTop {
+                width: 100vw;
+                height: 15vh;
+                max-width: 100vw;
+                max-height: 15vh;                
+                min-width: 100vw;
+                min-height: 15vh;                
+                left: 0px;
+                top: 0px;
+                position: absolute;
+            }
+
+            .header {
+                height: fit-content;
+            }
+
+            #dLocation {
+                position: absolute;
+                left: 90vw;
+                top: 0vh;
+            }
+
+            #dProgress {
+                text-align: center;
+                align-content: center;
+                vertical-align: middle;
+                position: absolute;
+                z-index: 100;
+                background-color: gray;
+                top: 0vh;
+                left: 0vw;
+                width: 100vw;
+                height: 100vh;
+                opacity: 0.8;
+            }
+
+            #dRawText {
+                text-align: center;
+                align-content: center;
+                vertical-align: middle;
+                position: absolute;
+                z-index: 2;
+                background-color: gray;
+                top: 0vh;
+                left: 0vw;
+                width: 100vw;
+                height: 100vh;
+            }            
+
+            #taRawText {
+                top: 5vh;
+                left: 5vw;
+                width: 90vw;
+                height: 90vh;
+                position: absolute;
+            }
+
+            #bCloseRawText {
+                height: 2.5vh;
+                width: 10vw;
+                top: 1.25vh;
+                position: absolute;
+            }
+        </style>
+        <script>
+            var App = {
+                updateCoordinates: function () {
+                    App.LocationXDiv.innerText = App.DataFieldView.originX() + 1;
+                    App.LocationYDiv.innerText = App.DataFieldView.originY() + 1;
+                    App.LocationXMaxDiv.innerText = App.DataField.width();
+                    App.LocationYMaxDiv.innerText = App.DataField.height();
+                },
+                openFiles: function(files) {
+                    if (files != null && files.length > 0) {
+                        App.displayProgressDiv();
+                        App.InputFileName = files[0].name;
+                        var parts = files[0].name.split(".");
+                        if (parts.length > 1) {
+                            App.DataType = parts[parts.length - 1].trim().toUpperCase();
+                            parts.pop();
+                            App.DataName = parts.join(".");
+                        } else {
+                            App.DataName = files[0].name;
+                            App.DataType = "CSV";
+                        }
+                        App.InputType.value = App.DataType;
+                        App.OutputType.value = App.DataType;
+                        App.OutputName.value = App.DataName + "." + App.OutputType.value.toLowerCase();
+                        
+                        files[0].text().then(text => {
+                            App.DataOriginal = text;
+                            App.loadData();
+                        });
+                    }
+                    //App.OpenFilesElement.value = App.InputFileName;
+                },
+                loadData: function () {
+                    App.onChange();
+                    var writer = com.field.sdtk.FieldWriter.writeToExpandableField();
+                    switch (App.DataType) {
+                        case "FJS":
+                            // TODO - Finish
+                            break;
+                        default:
+                            {
+                                var reader = new com.sdtk.std.StringReader(App.DataOriginal);
+                                if (App.DataType == null) {
+                                    App.DataType = "CSV";
+                                }
+                                switch (App.DataType) {
+                                    case "CSV":
+                                        reader = com.sdtk.table.DelimitedReader.createCSVReader(reader);
+                                        break;
+                                    case "PSV":
+                                        reader = com.sdtk.table.DelimitedReader.createPSVReader(reader);
+                                        break;
+                                    case "TSV":
+                                        reader = com.sdtk.table.DelimitedReader.createTSVReader(reader);
+                                        break;
+                                    default:
+                                        reader.dispose();
+                                        reader = null;
+                                        writer.dispose();
+                                        writer = null;
+                                }
+                                if (reader == null) {
+                                    App.DataField = null;
+                                    App.HeaderField = null;
+                                    App.DataDiv.innerHTML = "";
+                                    App.HeaderDiv.innerHTML = "";
+                                    App.DataFieldView = null;
+                                    App.HeaderFieldView = null;
+                                    App.closeProgressDiv();
+                                } else {
+                                    if (App.InputTextOnly) {
+                                        reader.alwaysString = true;
+                                    }
+                                    if (App.InputHeader) {
+                                        reader.noHeaderIncluded(false);
+                                    } else {
+                                        reader.noHeaderIncluded(true);
+                                    }
+                                    var field = writer.getField();
+                                    App.DataField = field;
+                                    reader.convertTo(writer);
+                                    reader.dispose();
+                                    writer.dispose();
+
+                                    writer = com.field.sdtk.FieldWriter.writeToExpandableField();
+                                    writer.start();
+                                    var rowWriter = writer.writeStart("Header", 0);
+                                    for (var i = 0; i < App.DataField.width(); i++) {
+                                        var l = App.DataField.get(i, 0);
+                                        rowWriter.write(l.name());
+                                        l.doneWith();
+                                    }
+                                    rowWriter.dispose();
+                                    rowWriter = null;
+                                    App.HeaderField = writer.getField();
+                                    writer.dispose();
+
+                                    App.DataField.compact(function (compacted) {
+                                        App.DataField = compacted;
+                                        App.loadDataFinish(compacted);
+                                    });
+                                    //App.loadDataFinish(field);
+                                }
+                            }
+                    }
+                },
+                loadDataFinish: function (field) {
+                    if (App.HeaderField != null) {
+                        App.DisplayDiv.className = "header-yes";
+                    } else {
+                        App.DisplayDiv.className = "header-no";
+                    }                    
+                    App.DataDiv.innerHTML = "";
+                    var height = App.Rows -  (App.HeaderField != null ? 1 : 0);
+                    App.DataFieldView = com.field.views.FieldView.create(
+                        com.field.views.FieldView.options()
+                        .field(App.DataField)
+                        .tileWidth(App.Columns < field.width() ? App.Columns : field.width())
+                        .tileHeight(height< field.height() ? height : field.height())
+                        .tileBuffer(0)
+                        .parent(App.DataDiv)
+                        .show(true)
+                        .noAreaXY(true)
+                        .autoUpdate(true)
+                        .scrollOnMove(true)
+                        .onEndOfUpdate(App.updateCoordinates)
+                        .movementForValidOnly()
+                        .tilesAreSquares(false)
+                        .onScroll(App.onScroll)
+                    );
+
+                    App.DataFieldView.startDefaultListeners(
+                        App.DataFieldView.startDefaultListenersOptions()
+                        .unknownKey(function (c) {
+                            c.toString();
+                            switch (c)
+                            {
+                                case 34:
+                                case 33:
+                                    {
+                                        var height = App.DataField.height();
+                                        var scroll = App.DataFieldView.height();
+                                        switch (c) {
+                                            case 33:
+                                                scroll = -1 * scroll;
+                                                break;
+                                        }
+                                        var origin = App.DataFieldView.originY();
+                                        var dest = origin + scroll;
+                                        if (dest < 0) {
+                                            dest = 0;
+                                        } else if (dest >= height) {
+                                            dest = height;
+                                        }
+                                        scroll = origin - dest;
+                                        App.DataFieldView.scrollView(0, scroll);
+                                    }
+                                    break;
+                            }
+                        })
+                    );
+
+                    App.HeaderDiv.innerHTML = "";
+                    if (App.HeaderField != null) {
+                        App.HeaderFieldView = com.field.views.FieldView.create(
+                            com.field.views.FieldView.options()
+                            .field(App.HeaderField)
+                            .tileWidth(App.Columns < field.width() ? App.Columns : field.width())
+                            .tileHeight(1)
+                            .tileBuffer(0)
+                            .parent(App.HeaderDiv)
+                            .show(true)
+                            .noAreaXY(true)
+                            .autoUpdate(true)
+                            .scrollOnMove(true)
+                            .onEndOfUpdate(App.updateCoordinates)
+                            .movementForValidOnly()
+                            .tilesAreSquares(false)
+                            .onScroll(App.onScroll)
+                        );
+
+                        App.HeaderFieldView.startDefaultListeners(
+                            App.HeaderFieldView.startDefaultListenersOptions()
+                        );
+                    }
+
+                    App.closeProgressDiv();
+                },
+                onLoad: function () {
+                    App.ProgressDiv = document.getElementById("dProgress");                    
+                    App.displayProgressDiv();
+                    App.InputType = document.getElementById("sInputType");
+                    App.OutputType = document.getElementById("sOutputType");
+                    App.LocationXDiv = document.getElementById("dLocationX");
+                    App.LocationYDiv = document.getElementById("dLocationY");
+                    App.LocationXMaxDiv = document.getElementById("dLocationXMax");
+                    App.LocationYMaxDiv = document.getElementById("dLocationYMax");
+                    App.OutputName = document.getElementById("iOutput");
+                    App.DownloadOutput = document.getElementById("bDownloadOutput");
+                    App.RawTextDiv = document.getElementById("dRawText");
+                    App.RawTextTextArea = document.getElementById("taRawText");
+                    App.OpenRawInput = document.getElementById("bOpenRawInput");
+                    App.OpenRawOutput = document.getElementById("bOpenRawOutput");
+                    App.CloseRawText = document.getElementById("bCloseRawText");
+                    App.HeaderDiv = document.getElementById("dHeader");
+                    App.DataDiv = document.getElementById("dData");
+                    App.OpenFilesElement = document.getElementById("openFiles");
+                    App.InputTextOnlyElement = document.getElementById("sInputTextOnly");
+                    App.InputHeaderElement = document.getElementById("sInputHeader");
+                    App.OutputHeaderElement = document.getElementById("sOutputHeader");
+
+                    App.InputType.onchange = App.onInputTypeChange;
+                    App.OutputType.onchange = App.onOutputTypeChange;
+                    App.DownloadOutput.onclick = App.onDownloadOutput;
+                    App.OpenRawInput.onclick = App.onOpenRawInput;
+                    App.OpenRawOutput.onclick = App.onOpenRawOutput;
+                    App.CloseRawText.onclick = App.onCloseRawText;
+
+                    window.addEventListener('resize', App.resize);                    
+
+                    // TODO - Additional formats
+                    var outputTypes = "CSV\nPSV\nTSV\nTable\nSQL\nC#\nHaxe\nJava\nPython".split("\n"); // \nFJS // \nJavaScript
+                    var inputTypes = "CSV\nPSV\nTSV".split("\n"); // \nFJS
+                    
+                    for (var i in inputTypes) {
+                        var t = inputTypes[i];
+                        App.InputType.options.add(new Option(t, t));
+                    }
+
+                    for (var i in outputTypes) {
+                        var t = outputTypes[i];
+                        App.OutputType.options.add(new Option(t, t));
+                    }
+
+                    App.DisplayDiv = document.getElementById("dDisplay");
+                                       
+
+                    com.field.Events.locationSelect().addEventListener(function (e) {
+                        var field = e.field();
+                        /*
+                        if (field.equals(App.FileTypesField)) {
+                            alert(sw.toString());
+                        }*/
+                    });
+
+                    App.closeProgressDiv();
+                },
+                onInputTypeChange: function () {
+                    App.onChange();
+                    App.DataType = App.InputType.value;
+                    App.loadData();
+                },
+                onOutputTypeChange: function () {
+                    App.onChange();
+                    if (App.DataName != null && App.DataName != "") {
+                        App.OutputName.value = App.DataName + "." + App.OutputType.value.toLowerCase();
+                    }
+                },
+                onGenerateOutput: function (callback) {
+                    if (App.DataOutput == null) {
+                        App.displayProgressDiv();
+                        setTimeout(function () {
+                            switch (App.OutputType.value) {
+                                case "FJS":
+                                    App.DataField.toJSONOptions().full().compressSpriteArray(false).compressLocationArray(false).compressJSON(false).callback(function (data) {
+                                        App.OutputType2 = "fjs";
+                                        App.DataOutput = data;
+                                        callback(App.DataOutput, App.OutputType2);
+                                        setTimeout(function () { App.closeProgressDiv(); }, 1);                                        
+                                    }).execute();
+                                    break;
+                                default:
+                                    {
+                                        var type;
+                                        var sw = new com.sdtk.std.StringWriter(null);
+                                        var writer = null;
+                                        var delimited = false;
+                                        switch (App.OutputType.value) {
+                                            case "CSV":
+                                                writer = com.sdtk.table.DelimitedWriter.createCSVWriter(sw);
+                                                type = "csv";
+                                                delimited = true;
+                                                break;
+                                            case "PSV":
+                                                writer = com.sdtk.table.DelimitedWriter.createPSVWriter(sw);
+                                                type = "psv";
+                                                delimited = true;
+                                                break;
+                                            case "TSV":
+                                                writer = com.sdtk.table.DelimitedWriter.createTSVWriter(sw);
+                                                type = "tsv";
+                                                delimited = true;
+                                                break;
+                                            case "SQL":
+                                                writer = com.sdtk.table.CodeWriter.createSQLSelectWriter(sw);
+                                                type = "sql";
+                                                break;
+                                            case "JAVA":
+                                                if (App.OutputHeader) {
+                                                    writer = com.sdtk.table.CodeWriter.createJavaArrayOfMapsWriter(sw);
+                                                } else {
+                                                    writer = com.sdtk.table.CodeWriter.createJavaArrayOfArraysWriter(sw);
+                                                }
+                                                type = "java";
+                                                break;
+                                            //case "JAVASCRIPT":
+                                            //    writer = com.sdtk.table.CodeWriter.createJavaArrayOfMapsWriterLegacy(sw);
+                                            //    type = "js";
+                                            //    break;
+                                            case "HAXE":
+                                                if (App.OutputHeader) {
+                                                    writer = com.sdtk.table.CodeWriter.createHaxeArrayOfMapsWriter(sw);
+                                                } else {
+                                                    writer = com.sdtk.table.CodeWriter.createHaxeArrayOfArraysWriter(sw);
+                                                }
+                                                type = "haxe";
+                                                break;
+                                            case "C#":
+                                                if (App.OutputHeader) {
+                                                    writer = com.sdtk.table.CodeWriter.createCSharpArrayOfMapsWriter(sw);
+                                                } else {
+                                                    writer = com.sdtk.table.CodeWriter.createCSharpArrayOfArraysWriter(sw);
+                                                }
+                                                type = "cs";
+                                                break;                                    
+                                            case "PYTHON":
+                                                if (App.OutputHeader) {
+                                                    writer = com.sdtk.table.CodeWriter.createPythonArrayOfMapsWriter(sw);
+                                                } else {
+                                                    writer = com.sdtk.table.CodeWriter.createPythonArrayOfArraysWriter(sw);
+                                                }                                                
+                                                type = "py";
+                                                break;                                                                        
+                                        }
+                                        if (delimited) {
+                                            if (App.OutputHeader) {
+                                                writer.noHeaderIncluded(false);
+                                            } else {
+                                                writer.noHeaderIncluded(true);
+                                            }
+                                        }
+                                        reader = com.field.sdtk.FieldReader.readWholeField(App.DataField);
+                                        reader.convertTo(writer);
+                                        reader.dispose();
+                                        writer.dispose();
+                                        App.DataOutput = sw.toString();
+                                        App.OutputType2 = type;
+                                        callback(App.DataOutput, App.OutputType2);
+                                        setTimeout(function () { App.closeProgressDiv(); }, 1);                                        
+                                    }
+                            }
+                        }, 1);
+                    } else {
+                        callback(App.DataOutput, App.OutputType2);
+                    }
+                },
+                onDownloadOutput: function () {
+                    App.onGenerateOutput(function (data, type) {
+                        const blob = new Blob([data], {type: 'text/' + type});
+                        if (window.navigator.msSaveOrOpenBlob) {
+                            window.navigator.msSaveBlob(blob, App.OutputName.value);
+                        } else {
+                            const elem = window.document.createElement('a');
+                            elem.href = window.URL.createObjectURL(blob);
+                            elem.download = App.OutputName.value;        
+                            document.body.appendChild(elem);
+                            elem.click();        
+                            document.body.removeChild(elem);
+                        }
+                    });
+                },
+                onOpenRaw: function (s, ro) {
+                    App.displayProgressDiv();
+                    setTimeout(function () {
+                        App.RawTextTextArea.value = s;
+                        App.RawTextTextArea.readOnly = ro;
+                        App.RawTextDiv.style.display = "";
+                        setTimeout(function () { App.closeProgressDiv(); }, 1);
+                    }, 1);
+                },
+                onOpenRawInput: function () {
+                    App.onOpenRaw(App.DataOriginal, false);
+                },
+                onOpenRawOutput: function () {
+                    App.onGenerateOutput(function (data, type) {
+                        App.onOpenRaw(data, true);
+                    });
+                },
+                displayProgressDiv: function () {
+                    App.ProgressDivRequests++;
+                    if (App.ProgressDivRequests == 1) {
+                        App.ProgressDiv.style.display = "";
+                    }
+                },
+                closeProgressDiv: function () {
+                    App.ProgressDivRequests--;
+                    if (App.ProgressDivRequests < 0) {
+                        App.ProgressDivRequests = 0;
+                    }
+                    if (App.ProgressDivRequests == 0) {
+                        App.ProgressDiv.style.display = "none";
+                    }
+                },
+                onCloseRawText: function () {
+                    if (App.RawTextTextArea.readOnly) {
+                        App.RawTextDiv.style.display = "none";
+                        App.RawTextTextArea.value = "";
+                    } else {
+                        if (App.RawTextTextArea.value == App.DataOriginal) {
+                            App.RawTextDiv.style.display = "none";
+                            App.RawTextTextArea.value = "";
+                        } else {
+                            App.displayProgressDiv();
+                            setTimeout(function () {
+                                App.DataOriginal = App.RawTextTextArea.value;
+                                App.RawTextTextArea.value = "";
+                                App.RawTextDiv.style.display = "none";
+                                App.loadData();
+                                setTimeout(function () { App.closeProgressDiv(); }, 1);
+                            }, 1);
+                        }
+                    }
+                },
+                onChange: function () {
+                    App.OutputType2 = null;
+                    App.DataOutput = null;
+                },
+                onDrop: function (e) {
+                    e.preventDefault();
+                    App.openFiles(e.dataTransfer.files);
+                },
+                onScroll: function (view, x, y) {
+                    if (App.Scrolling) {
+                        return;
+                    } else {
+                        App.Scrolling = true;
+                        if (view == App.HeaderFieldView) {
+                            App.DataFieldView.scrollView(x, y);
+                        } else {
+                            App.HeaderFieldView.scrollView(x, 0);
+                        }
+                        App.Scrolling = false;
+                    }
+                },
+                changeInputOption: function (e) {
+                    var value;
+                    switch (e.target.value.toString().trim().substring(0,1).toUpperCase()) {
+                        case "N": case "0":
+                            value = false;
+                            break;
+                        case "Y": case "1":
+                            value = true;
+                            break;
+                    }
+
+                    if (e.target == App.InputTextOnlyElement) {
+                        App.InputTextOnly = value;
+                    } else if (e.target == App.InputHeaderElement) {
+                        App.InputHeader = value;
+                    }
+                    App.loadData();
+                },
+                changeOutputOption: function (e) {
+                    var value;
+                    switch (e.target.value.toString().trim().substring(0,1).toUpperCase()) {
+                        case "N": case "0":
+                            value = false;
+                            break;
+                        case "Y": case "1":
+                            value = true;
+                            break;
+                    }
+
+                    if (e.target == App.OutputHeaderElement) {
+                        App.OutputHeader = value;
+                    }
+                    App.DataOutput = null;
+                },
+                resize: function (e) {
+                    if (App.DataField != null) {
+                        App.loadDataFinish(App.DataField);
+                    }
+                },
+                LocationXDiv: null,
+                LocationYDiv: null,
+                LocationXMaxDiv: null,
+                LocationYMaxDiv: null,
+                DisplayDiv: null,
+                DataDiv: null,
+                HeaderDiv: null,
+                DataField: null,
+                DataFieldView: null,
+                HeaderField: null,
+                HeaderFieldView: null,                
+                DataOriginal: null,
+                DataOutput: null,
+                DataType: null,
+                DataName: null,
+                InputType: null,
+                OutputType: null,
+                OutputType2: null,
+                OutputName: null,
+                DownloadOutput: null,
+                Columns: 10,
+                Rows: 10,
+                ProgressDiv: null,
+                RawTextDiv: null,
+                RawTextTextArea: null,
+                OpenRawInput: null,
+                OpenRawOutput: null,
+                CloseRawText: null,
+                ProgressDivRequests: 0,
+                Scrolling: false,
+                OpenFilesElement: null,
+                InputFileName : null,
+                InputTextOnly: true,
+                InputTextOnlyElement: null,
+                InputHeaderElement: null,
+                InputHeader: true,
+                OutputHeaderElement: null,
+                OutputHeader: true,
+            }
+        </script>
+    </head>
+    <body onload="App.onLoad()">
+        <div id="dTop" ondrop="App.onDrop(event)">
+            <h1><a href="https://sourceforge.net/projects/simple-data-toolkit/">Simple Data Toolkit</a> - Online Portal</h1>
+            Copyright (C) 2021, Vis LLC.<br/>
+            All rights reserved.<br/>
+            All data is kept locally.<br/>
+            <div id="dLocation"><div id="dLocationX"></div>/<div id="dLocationXMax"></div><br /><div id="dLocationY"></div>/<div id="dLocationYMax"></div></div>
+            <div>Input: <input type="file" id="openFiles" multiple accept="*" onchange="App.openFiles(this.files)"><input type="button" id="bOpenRawInput" value="Show Raw Input"></input>Type: <select id="sInputType"></select> Header: <select id="sInputHeader" onchange="App.changeInputOption(event)"><option value="Yes">Yes</option><option value="No">No</option></select>  Text Only: <select id="sInputTextOnly" onchange="App.changeInputOption(event)"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+            <!-- TODO <div>Filter: </div>-->
+            <div>Output: <input type="text" id="iOutput"></input> Type: <select id="sOutputType"></select> Header: <select id="sOutputHeader" onchange="App.changeOutputOption(event)"><option value="Yes">Yes</option><option value="No">No</option></select> Text Only: <select id="sOutputTextOnly"></select></div>
+            <div><input type="button" id="bDownloadOutput" value="Download Output"></input> Script: <select id="sScriptType"></select> <input type="button" id ="dDownloadScript" value="Download Script"><input type="button" id="bOpenRawOutput" value="Show Raw Output"></div>
+        </div>
+        <div id="dDisplay" ondrop="App.onDrop(event)">
+            <div id="dHeader"></div>
+            <div id="dData"></div>
+        </div>
+        <div id="dProgress" style="display:none"><h1>Processing...</h1></div>
+        <div id="dRawText" style="display:none">
+            <input type="button" id="bCloseRawText" value="Close"></input><br />
+            <textarea type="text" id="taRawText"></textarea>
+        </div>
+    </body>
+</html>
