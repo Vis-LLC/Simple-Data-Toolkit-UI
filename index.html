@@ -151,7 +151,13 @@
                         }
                         App.InputType.value = App.DataType;
                         App.OutputType.value = App.DataType;
-                        App.OutputName.value = App.DataName + "." + App.OutputType.value.toLowerCase();
+                        var ext = App.OutputType.value.toLowerCase();
+                        switch (ext) {
+                            case "htmltable":
+                                ext = "html";
+                                break;
+                        }
+                        App.OutputName.value = App.DataName + "." + ext;
                         
                         files[0].text().then(text => {
                             App.DataOriginal = text;
@@ -183,6 +189,21 @@
                                     case "TSV":
                                         reader = com.sdtk.table.DelimitedReader.createTSVReader(reader);
                                         break;
+                                    case "DIR":
+                                        reader = com.sdtk.table.FileSystemWriter.createCMDDirReader(reader);
+                                        break;
+                                    case "INI":
+                                        reader = com.sdtk.table.KeyValueWriter.createINIReader(reader);
+                                        break;
+                                    case "PROPERTIES":
+                                        reader = com.sdtk.table.KeyValueWriter.createPropertiesReader(reader);
+                                        break;
+                                    case "SPLUNK":
+                                        reader = com.sdtk.table.KeyValueWriter.createSplunkReader(reader);
+                                        break;                                                
+                                    case "JSON":
+                                        reader = com.sdtk.table.KeyValueWriter.createJSONReader(reader);
+                                        break;
                                     default:
                                         reader.dispose();
                                         reader = null;
@@ -199,7 +220,7 @@
                                     App.closeProgressDiv();
                                 } else {
                                     if (App.InputTextOnly) {
-                                        reader.alwaysString = true;
+                                        reader.alwaysString(true);
                                     }
                                     if (App.InputHeader) {
                                         reader.noHeaderIncluded(false);
@@ -338,6 +359,8 @@
                     App.InputTextOnlyElement = document.getElementById("sInputTextOnly");
                     App.InputHeaderElement = document.getElementById("sInputHeader");
                     App.OutputHeaderElement = document.getElementById("sOutputHeader");
+                    App.DownloadScript = document.getElementById("dDownloadScript");
+                    App.ScriptTypes = document.getElementById("sScriptType");
 
                     App.InputType.onchange = App.onInputTypeChange;
                     App.OutputType.onchange = App.onOutputTypeChange;
@@ -345,12 +368,14 @@
                     App.OpenRawInput.onclick = App.onOpenRawInput;
                     App.OpenRawOutput.onclick = App.onOpenRawOutput;
                     App.CloseRawText.onclick = App.onCloseRawText;
-
+                    App.DownloadScript.onclick = App.onDownloadScript;
+                
                     window.addEventListener('resize', App.resize);                    
 
                     // TODO - Additional formats
-                    var outputTypes = "CSV\nPSV\nTSV\nTable\nSQL\nC#\nHaxe\nJava\nPython".split("\n"); // \nFJS // \nJavaScript
-                    var inputTypes = "CSV\nPSV\nTSV".split("\n"); // \nFJS
+                    var outputTypes = "CSV\nPSV\nTSV\nHTMLTable\nSQL\nC#\nHaxe\nJava\nPython\nJSON\nINI\nPROPERTIES\nDIR\nSPLUNK\nTeX\nTXT".split("\n"); // \nFJS // \nJavaScript
+                    var inputTypes = "CSV\nPSV\nTSV\nJSON\nINI\nPROPERTIES\nDIR\nSPLUNK".split("\n"); // \nFJS
+                    var scriptTypes = "BATCH\nSH\nC#\nHaxe\nJava\nJavaScript\nPHP\nPython".split("\n");
                     
                     for (var i in inputTypes) {
                         var t = inputTypes[i];
@@ -360,6 +385,11 @@
                     for (var i in outputTypes) {
                         var t = outputTypes[i];
                         App.OutputType.options.add(new Option(t, t));
+                    }
+
+                    for (var i in scriptTypes) {
+                        var t = scriptTypes[i];
+                        App.ScriptTypes.options.add(new Option(t, t));
                     }
 
                     App.DisplayDiv = document.getElementById("dDisplay");
@@ -383,7 +413,13 @@
                 onOutputTypeChange: function () {
                     App.onChange();
                     if (App.DataName != null && App.DataName != "") {
-                        App.OutputName.value = App.DataName + "." + App.OutputType.value.toLowerCase();
+                        var ext = App.OutputType.value.toLowerCase();
+                        switch (ext) {
+                            case "htmltable":
+                                ext = "html";
+                                break;
+                        }
+                        App.OutputName.value = App.DataName + "." + ext;
                     }
                 },
                 onGenerateOutput: function (callback) {
@@ -406,6 +442,12 @@
                                         var writer = null;
                                         var delimited = false;
                                         switch (App.OutputType.value) {
+                                            case "TXT":
+                                                writer = com.sdtk.table.DelimitedWriter.createRawWriter(sw);
+                                                break;
+                                            case "TeX":
+                                                writer = com.sdtk.table.DelimitedWriter.createTeXWriter(sw);
+                                                break;                                                
                                             case "CSV":
                                                 writer = com.sdtk.table.DelimitedWriter.createCSVWriter(sw);
                                                 type = "csv";
@@ -433,10 +475,30 @@
                                                 }
                                                 type = "java";
                                                 break;
-                                            //case "JAVASCRIPT":
-                                            //    writer = com.sdtk.table.CodeWriter.createJavaArrayOfMapsWriterLegacy(sw);
-                                            //    type = "js";
-                                            //    break;
+                                            case "HTMLTable":
+                                                writer = com.sdtk.table.TableWriter.createStandardTableWriterForWriter(sw);
+                                                type = "htmltable";
+                                                break;
+                                            case "DIR":
+                                                writer = com.sdtk.table.FileSystemWriter.createCMDDirWriter(sw);
+                                                type = "dir";
+                                                break;
+                                            case "INI":
+                                                writer = com.sdtk.table.KeyValueWriter.createINIWriter(sw);
+                                                type = "ini";
+                                                break;
+                                            case "PROPERTIES":
+                                                writer = com.sdtk.table.KeyValueWriter.createPropertiesWriter(sw);
+                                                type = "properties";
+                                                break;
+                                            case "SPLUNK":
+                                                writer = com.sdtk.table.KeyValueWriter.createSplunkWriter(sw);
+                                                type = "splunk";
+                                                break;                                                
+                                            case "JSON":
+                                                writer = com.sdtk.table.KeyValueWriter.createJSONWriter(sw);
+                                                type = "json";
+                                                break;
                                             case "HAXE":
                                                 if (App.OutputHeader) {
                                                     writer = com.sdtk.table.CodeWriter.createHaxeArrayOfMapsWriter(sw);
@@ -460,7 +522,7 @@
                                                     writer = com.sdtk.table.CodeWriter.createPythonArrayOfArraysWriter(sw);
                                                 }                                                
                                                 type = "py";
-                                                break;                                                                        
+                                                break;                                                                
                                         }
                                         if (delimited) {
                                             if (App.OutputHeader) {
@@ -484,19 +546,22 @@
                         callback(App.DataOutput, App.OutputType2);
                     }
                 },
+                downloadResult: function (n, s, t) {
+                    const blob = new Blob([s], {type: 'text/' + t});
+                    if (window.navigator.msSaveOrOpenBlob) {
+                        window.navigator.msSaveBlob(blob, n);
+                    } else {
+                        const elem = window.document.createElement('a');
+                        elem.href = window.URL.createObjectURL(blob);
+                        elem.download = n;
+                        document.body.appendChild(elem);
+                        elem.click();        
+                        document.body.removeChild(elem);
+                    }
+                },
                 onDownloadOutput: function () {
                     App.onGenerateOutput(function (data, type) {
-                        const blob = new Blob([data], {type: 'text/' + type});
-                        if (window.navigator.msSaveOrOpenBlob) {
-                            window.navigator.msSaveBlob(blob, App.OutputName.value);
-                        } else {
-                            const elem = window.document.createElement('a');
-                            elem.href = window.URL.createObjectURL(blob);
-                            elem.download = App.OutputName.value;        
-                            document.body.appendChild(elem);
-                            elem.click();        
-                            document.body.removeChild(elem);
-                        }
+                        App.downloadResult(App.OutputName.value, data, type)
                     });
                 },
                 onOpenRaw: function (s, ro) {
@@ -515,6 +580,171 @@
                     App.onGenerateOutput(function (data, type) {
                         App.onOpenRaw(data, true);
                     });
+                },
+                onDownloadScript : function () {
+                    function getFormatMethod(s) {
+                        var method = s.toLowerCase();
+                        switch (method) {
+                            case "htmltable":
+                                method = "htmlTable";
+                        }
+                        return method;
+                    }
+                    var n;
+                    var t = "application/script";
+                    var commands = [];
+                    switch (App.ScriptTypes.value.toUpperCase()) {
+                        case "BATCH":
+                            commands.push("stc \"");
+                            commands.push(App.InputFileName);
+                            commands.push("\" ");
+                            if (!(App.InputHeader)) {
+                                commands.push("excludeheader ");
+                            }
+                            if (App.InputTextOnly) {
+                                commands.push("textonly ");
+                            }
+                            commands.push("\"");
+                            commands.push(App.OutputName.value);
+                            commands.push("\"");
+                            if (!(App.OutputHeader)) {
+                                commands.push(" excludeheader");
+                            }
+                            if (App.OutputTextOnly) {
+                                commands.push(" textonly ");
+                            }
+                            commands.push("\n");
+                            n = "convert.bat";
+                            break;
+                        case "SH":
+                            commands.push("#!/bin/sh\n");
+                            commands.push("stc ");
+                            commands.push(App.InputFileName);
+                            commands.push("\" ");
+                            if (!(App.InputHeader)) {
+                                commands.push("excludeheader ");
+                            }
+                            if (App.InputTextOnly) {
+                                commands.push("textonly ");
+                            }
+                            commands.push("\"");
+                            commands.push(App.OutputName.value);
+                            commands.push("\"");
+                            if (!(App.OutputHeader)) {
+                                commands.push(" excludeheader");
+                            }
+                            if (App.OutputTextOnly) {
+                                commands.push(" textonly ");
+                            }
+                            commands.push("\n");
+                            n = "convert.sh";
+                            break;
+                        case "C#":
+                        case "HAXE":
+                        case "JAVA":
+                        case "JAVASCRIPT":
+                            commands.push("com.sdtk.table.Converter.start().readFile(\"");
+                            commands.push(App.InputFileName);
+                            commands.push("\").");
+                            commands.push(getFormatMethod(App.DataType));
+                            commands.push("().");
+                            if (App.InputTextOnly) {
+                                commands.push("textOnly().");
+                            }
+                            if (!(App.InputHeader)) {
+                                commands.push("excludeHeader().");
+                            }
+                            commands.push("output()")
+                            commands.push(".writeFile(\"");
+                            commands.push(App.OutputName.value);
+                            commands.push("\").");
+                            commands.push(getFormatMethod(App.OutputType.value));
+                            commands.push("().");
+                            if (!(App.OutputHeader)) {
+                                commands.push("excludeHeader().");
+                            }
+                            commands.push("execute();\n");
+                            switch (App.ScriptTypes.value.toUpperCase()) {
+                                case "C#":
+                                    n = "convert.cs";
+                                    break;
+                                case "HAXE":
+                                    n = "convert.hx";
+                                    break;
+                                case "JAVA":
+                                    n = "convert.java";
+                                    break;
+                                case "JAVASCRIPT":
+                                    n = "convert.js";
+                                    break;
+                            }
+                            break;
+                        case "PHP":
+                            commands.push("<?php\n");
+                            commands.push("\tuse \\com\\sdtk\\table\\Converter;\n");
+                            commands.push("\n");
+                            commands.push("\tset_include_path(get_include_path().PATH_SEPARATOR.__DIR__.'/lib');\n");
+                            commands.push("\tspl_autoload_register(\n");
+                            commands.push("\t\tfunction($class) {\n");
+                            commands.push("\t\t\t$file = stream_resolve_include_path(str_replace('\\', '/', $class) .'.php');\n");
+                            commands.push("\t\t\tif ($file) {\n");
+                            commands.push("\t\t\t\tinclude_once $file;\n");
+                            commands.push("\t\t\t}\n");
+                            commands.push("\t\t}\n");
+                            commands.push("\t};\n");
+                            commands.push("\t\\php\\Boot::__hx__init();\n");
+                            commands.push("\n");
+                            commands.push("\tConverter::start()->readFile(\"");
+                            commands.push(App.InputFileName);
+                            commands.push(getFormatMethod(App.DataType));
+                            commands.push("()->");
+                            if (App.InputTextOnly) {
+                                commands.push("textOnly()->");
+                            }
+                            if (!(App.InputHeader)) {
+                                commands.push("excludeHeader()->");
+                            }
+                            commands.push("output()")
+                            commands.push("->writeFile(\"");
+                            commands.push(App.OutputName.value);                            
+                            commands.push("\")->");
+                            commands.push(getFormatMethod(App.OutputType.value));
+                            commands.push("()->");
+                            if (!(App.OutputHeader)) {
+                                commands.push("excludeHeader()->");
+                            }
+                            commands.push("execute();\n");
+                            commands.push("?>");
+                            n = "convert.php";
+                            break;
+                        case "PYTHON":
+                            commands.push("from sdtk import com_sdtk_table_Converter as sdtk\n");
+                            commands.push("\n");
+                            commands.push("sdtk.start().readFile(\"");
+                            commands.push(App.InputFileName);
+                            commands.push("\").");
+                            commands.push(getFormatMethod(App.DataType));
+                            commands.push("().");
+                            if (App.InputTextOnly) {
+                                commands.push("textOnly().");
+                            }
+                            if (!(App.InputHeader)) {
+                                commands.push("excludeHeader().");
+                            }
+                            commands.push("output()")
+                            commands.push(".writeFile(\"");
+                            commands.push(App.OutputName.value);
+                            commands.push("\").");
+                            commands.push(getFormatMethod(App.OutputType.value));
+                            commands.push("().");
+                            if (!(App.OutputHeader)) {
+                                commands.push("excludeHeader().");
+                            }
+                            commands.push("execute();\n");
+                            n = "convert.py";
+                            break;
+                    }
+                    App.downloadResult(n, commands.join(""), t);
                 },
                 displayProgressDiv: function () {
                     App.ProgressDivRequests++;
@@ -649,6 +879,8 @@
                 InputHeader: true,
                 OutputHeaderElement: null,
                 OutputHeader: true,
+                DownloadScript: null,
+                ScriptTypes: null,
             }
         </script>
     </head>
